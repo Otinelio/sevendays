@@ -1,0 +1,10 @@
+{
+  "name": "sevendays",
+  "short_name": "sevendays",
+  "description": "Urban Fast Casual — Burgers, Pizzas, Snacks. Lomé, Togo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1F1F1F",
+  "theme_color": "#B62828",
+  "icons": []
+}
