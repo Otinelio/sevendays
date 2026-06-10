@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle } from "lucide-react";
 import { MenuCard } from "@/components/MenuCard";
 import { CartDrawer } from "@/components/CartDrawer";
 import { useCart } from "@/store/cartStore";
-import { supabase } from "@/integrations/supabase/client";
 import { CATEGORY_LABELS, CATEGORY_ORDER, defaultMenu, formatFCFA } from "@/data/defaultMenu";
 import { ShoppingCart } from "lucide-react";
 
@@ -20,30 +19,19 @@ function TablePage() {
   const [sent, setSent] = useState<{ id: string } | null>(null);
   const [status, setStatus] = useState<OrderStatus>("pending");
 
-  useEffect(() => {
-    if (!sent) return;
-    const channel = supabase
-      .channel(`order-${sent.id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${sent.id}` }, (payload) => {
-        const s = (payload.new as any).status as OrderStatus;
-        setStatus(s);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [sent]);
-
   const sendToKitchen = async () => {
     if (items.length === 0) return;
-    const total = subtotal();
-    const { data, error } = await supabase.from("orders").insert({
-      table_number: Number(tableNumber) || 0,
-      items: items.map((i) => ({ id: i.id, name: i.name, qty: i.qty, price: i.price })),
-      total_fcfa: total,
-      status: "pending",
-    }).select("id").single();
-    if (error || !data) { alert("Failed to send order"); return; }
-    setSent({ id: data.id });
-    clear();
+    
+    // Simulate sending to kitchen
+    setTimeout(() => {
+      setSent({ id: Math.random().toString(36).substring(7) });
+      setStatus("pending");
+      clear();
+      
+      // Simulate status updates
+      setTimeout(() => setStatus("confirmed"), 3000);
+      setTimeout(() => setStatus("delivered"), 8000);
+    }, 500);
   };
 
   return (
@@ -112,3 +100,4 @@ function TablePage() {
     </div>
   );
 }
+

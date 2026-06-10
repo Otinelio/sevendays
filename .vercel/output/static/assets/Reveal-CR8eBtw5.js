@@ -1,0 +1,1 @@
+import{j as r}from"./index-CG80V2o_.js";import{m as a}from"./proxy-CgjkZGTe.js";function m({children:i,delay:t=0,className:o,y:e=40}){return r.jsx(a.div,{initial:{opacity:0,y:e},whileInView:{opacity:1,y:0},viewport:{once:!0,margin:"-80px"},transition:{duration:.6,delay:t,ease:"easeOut"},className:o,children:i})}export{m as R};

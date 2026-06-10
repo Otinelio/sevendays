@@ -1,10 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { PINGate } from "@/components/PINGate";
-import { supabase } from "@/integrations/supabase/client";
 import { formatFCFA } from "@/data/defaultMenu";
-import { playChime } from "@/utils/audio";
 
 export const Route = createFileRoute("/reception")({
   component: ReceptionPage,
@@ -27,40 +25,10 @@ function ReceptionPage() {
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
-  const knownIds = useRef<Set<string>>(new Set());
   const [flash, setFlash] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const { data } = await supabase.from("orders").select("*").gte("created_at", today.toISOString()).order("created_at", { ascending: false });
-      const list = ((data || []) as unknown) as Order[];
-      list.forEach((o) => knownIds.current.add(o.id));
-      setOrders(list);
-    };
-    load();
-    const channel = supabase
-      .channel("reception-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
-        if (payload.eventType === "INSERT") {
-          const n = (payload.new as unknown) as Order;
-          if (!knownIds.current.has(n.id)) {
-            knownIds.current.add(n.id);
-            setOrders((prev) => [n, ...prev]);
-            playChime();
-            setFlash(true);
-            setTimeout(() => setFlash(false), 1200);
-          }
-        } else if (payload.eventType === "UPDATE") {
-          setOrders((prev) => prev.map((o) => o.id === (payload.new as any).id ? ((payload.new as unknown) as Order) : o));
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const setStatus = async (id: string, status: Order["status"]) => {
-    await supabase.from("orders").update({ status }).eq("id", id);
+  const setStatus = (id: string, status: Order["status"]) => {
+    setOrders(orders.map((o) => o.id === id ? { ...o, status } : o));
   };
 
   const today = orders;

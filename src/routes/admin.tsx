@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogOut, Trash2 } from "lucide-react";
 import { PINGate } from "@/components/PINGate";
-import { supabase } from "@/integrations/supabase/client";
 import { defaultMenu, CATEGORY_LABELS, CATEGORY_ORDER, formatFCFA, type MenuItem } from "@/data/defaultMenu";
 import { useSettings } from "@/store/settingsStore";
 
@@ -55,29 +54,22 @@ function MenuTab() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("menu_items").select("*").order("category").order("sort_order");
-    setItems(((data || []) as any) as MenuItem[]);
+    setItems(defaultMenu as MenuItem[]);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
   const seed = async () => {
     if (!confirm("Seed default menu? This adds all default items.")) return;
-    const rows = defaultMenu.map((m, i) => ({
-      category: m.category, name: m.name, description: m.description, price_fcfa: m.price_fcfa, image_url: m.image_url, sort_order: i,
-    }));
-    await supabase.from("menu_items").insert(rows);
     await load();
   };
 
   const toggleSoldOut = async (i: MenuItem) => {
-    await supabase.from("menu_items").update({ sold_out: !i.sold_out }).eq("id", i.id);
-    load();
+    setItems(items.map(item => item.id === i.id ? { ...item, sold_out: !item.sold_out } : item));
   };
   const del = async (id: string) => {
     if (!confirm("Delete this item?")) return;
-    await supabase.from("menu_items").delete().eq("id", id);
-    load();
+    setItems(items.filter(item => item.id !== id));
   };
 
   return (
@@ -120,10 +112,6 @@ function MenuTab() {
 function OrdersTab() {
   const [orders, setOrders] = useState<any[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "confirmed" | "delivered">("all");
-
-  useEffect(() => {
-    supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(500).then(({ data }) => setOrders(data || []));
-  }, []);
 
   const filtered = orders.filter((o) => filter === "all" || o.status === filter);
 
@@ -168,6 +156,7 @@ function OrdersTab() {
             ))}
           </tbody>
         </table>
+        {filtered.length === 0 && <p className="text-cream/50 py-4">No orders found.</p>}
       </div>
     </div>
   );
@@ -205,20 +194,17 @@ function PromosTab() {
   const [bg, setBg] = useState("#B62828");
   const [color, setColor] = useState("#F4E8DA");
 
-  const load = async () => {
-    const { data } = await supabase.from("promos").select("*").order("created_at", { ascending: false });
-    setPromos(data || []);
-  };
-  useEffect(() => { load(); }, []);
-
   const create = async () => {
     if (!text.trim()) return;
-    await supabase.from("promos").insert({ text, bg_color: bg, text_color: color, active: true });
+    setPromos([{ id: Math.random().toString(), text, bg_color: bg, text_color: color, active: true }, ...promos]);
     setText("");
-    load();
   };
-  const toggle = async (id: string, active: boolean) => { await supabase.from("promos").update({ active: !active }).eq("id", id); load(); };
-  const del = async (id: string) => { await supabase.from("promos").delete().eq("id", id); load(); };
+  const toggle = async (id: string, active: boolean) => {
+    setPromos(promos.map(p => p.id === id ? { ...p, active: !active } : p));
+  };
+  const del = async (id: string) => { 
+    setPromos(promos.filter(p => p.id !== id));
+  };
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -232,6 +218,7 @@ function PromosTab() {
         </div>
       </div>
       <div className="space-y-2">
+        {promos.length === 0 && <p className="text-cream/50">No promos added.</p>}
         {promos.map((p) => (
           <div key={p.id} className="rounded p-3 flex items-center justify-between" style={{ background: p.bg_color, color: p.text_color }}>
             <span className="font-semibold">{p.text}</span>
