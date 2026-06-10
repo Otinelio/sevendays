@@ -2,6 +2,52 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+// Dummy no-op client returned when Supabase env vars are missing.
+// Every chained method returns { data: null, error: null } so the
+// rest of the app renders with empty data instead of crashing.
+function createDummyClient(): any {
+  const handler: ProxyHandler<any> = {
+    get(_, prop) {
+      if (prop === 'then') return undefined; // prevent Promise resolution
+      if (prop === 'removeChannel') return () => {};
+      if (prop === 'channel') {
+        return () => new Proxy({}, {
+          get(_, p2) {
+            if (p2 === 'subscribe') return () => ({});
+            if (p2 === 'on') return () => new Proxy({}, handler);
+            return () => new Proxy({}, handler);
+          },
+        });
+      }
+      return (..._args: any[]) => new Proxy({}, {
+        get(_, p2) {
+          if (p2 === 'then') return undefined;
+          if (['select', 'insert', 'update', 'delete', 'eq', 'gte', 'lte', 'order', 'limit', 'single'].includes(String(p2))) {
+            return (..._a: any[]) => new Proxy({}, {
+              get(_, p3) {
+                if (p3 === 'then') {
+                  return (resolve: any) => resolve({ data: null, error: { message: 'Supabase not configured' } });
+                }
+                if (['select', 'insert', 'update', 'delete', 'eq', 'gte', 'lte', 'order', 'limit', 'single'].includes(String(p3))) {
+                  return (..._b: any[]) => new Proxy({}, {
+                    get(__, p4) {
+                      if (p4 === 'then') return (resolve: any) => resolve({ data: null, error: { message: 'Supabase not configured' } });
+                      return () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } });
+                    }
+                  });
+                }
+                return () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } });
+              }
+            });
+          }
+          return () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } });
+        },
+      });
+    },
+  };
+  return new Proxy({}, handler);
+}
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
@@ -13,9 +59,8 @@ function createSupabaseClient() {
       ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
       ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+    console.warn(`[Supabase] Missing env var(s): ${missing.join(', ')}. Supabase features disabled.`);
+    return createDummyClient();
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
